@@ -16,6 +16,7 @@ INDEX_POSITION = 1
 
 numBytes = (string) -> string.length * 2
 
+
 ###
 # Size conversions
 # ----------------
@@ -146,6 +147,7 @@ eject = (store) ->
   datum = store.ordering.pop()?.data
   delete store.data[datum.key] if datum
   return
+
 
 ###
 # Datum class
