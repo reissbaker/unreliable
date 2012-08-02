@@ -18,18 +18,6 @@ numBytes = (string) -> string.length * 2
 
 
 ###
-# Size conversions
-# ----------------
-#
-# For self-documenting filesize descriptions
-###
-
-bytes = (x) -> x
-kilobytes = (x) -> bytes(x) * 1024
-megabytes = (x) -> kilobytes(x) * 1024
-
-
-###
 # Store
 # =====
 ###
@@ -39,7 +27,7 @@ class Store
     read = -> store.getItem(key)
     write = (data) -> store.setItem key, data
     proxy = new Store read, write
-    proxy.maxBytes = bytes || megabytes(4)
+    proxy.maxBytes = bytes || 1024 * 1024 * 4
     proxy
 
   constructor: (@read, @write) ->
@@ -52,11 +40,7 @@ class Store
         JSON.parse(x) || {}
       catch e
         {}
-    @encode = (x) ->
-      try
-        JSON.stringify(x) || ''
-      catch e
-        ''
+    @encode = (x) -> JSON.stringify(x)
     @namespace = null
 
   setItem: (key, val) ->
@@ -64,11 +48,10 @@ class Store
 
     if !@data.hasOwnProperty(key)
       datum = @data[key] = new Datum(key, val)
-      datum.iter = @ordering.unshift(datum)
+      datum.i = @ordering.unshift(datum)
     else
       datum = @data[key]
-      datum.val = val
-      iter = datum.iter
+      datum.v = val
       promote(this, datum)
 
     serialize(this)
@@ -78,11 +61,11 @@ class Store
     datum = @data[key]
     if datum
       delete @data[key]
-      @ordering.remove(datum.iter)
+      @ordering.remove(datum.i)
       serialize(this)
-      true
+      datum.v
     else
-      false
+      datum
 
   getItem: (key, cbk) ->
     hydrate this
@@ -90,7 +73,7 @@ class Store
     if datum
       promote(this, datum)
       serialize(this)
-      datum.val
+      datum.v
     else
       datum
 
@@ -98,6 +81,7 @@ class Store
     @data = {}
     @ordering = new LinkedList
     serialize(this)
+    return
 
 
 ###
@@ -106,59 +90,62 @@ class Store
 ###
 
 promote = (store, datum) ->
-  store.ordering.remove datum.iter
-  datum.iter = store.ordering.unshift(datum)
+  store.ordering.remove datum.i
+  datum.i = store.ordering.unshift(datum)
 
 serialize = (store) ->
-  ir = intermediateRepresentation(store)
-  if store.namespace
-    temp = {}
-    temp[store.namespace] = ir
-    ir = temp
-  serialization = store.encode(ir)
-  if store.maxBytes >= 0 && numBytes(serialization) > store.maxBytes
-    if store.ordering.length > 0
-      eject(store)
-      serialize(store)
+  serialization = store.encode intermediateRepresentation(store)
+
+  if store.maxBytes >= 0 && numBytes(serialization) > store.maxBytes && store.ordering.length > 0
+    eject(store)
+    serialize(store)
+    return
   else
     store.write serialization
     return
 
 intermediateRepresentation = (store) ->
-  data = {}
+  ir = {}
   storeOrdering = store.ordering
   iter = storeOrdering.head
   index = 0
   while iter
     curr = iter.data
-    serialization = data[curr.key] = new Array(2)
-    serialization[VAL_POSITION] = curr.val
+    serialization = ir[curr.k] = []
+    serialization[VAL_POSITION] = curr.v
     serialization[INDEX_POSITION] = index
     index++
     iter = iter.next
-  data
+  
+  namespace = store.namespace
+  if namespace
+    temp = {}
+    temp[namespace] = ir
+    ir = temp
+  ir
 
 hydrate = (store) ->
   return if store.hydrated
 
   data = store.decode(store.read() || '') || {}
-  if store.namespace
-    data = data[store.namespace] || {}
+  data = data[store.namespace] || {} if store.namespace
 
   ordering = []
   for own key of data
     curr = data[key]
     index = curr[INDEX_POSITION]
     ordering[index] = data[key] = new Datum(key, curr[VAL_POSITION])
+
   for datum in ordering
-    datum.iter = store.ordering.push(datum)
+    datum.i = store.ordering.push(datum)
+
   store.data = data
   store.hydrated = true
   return
 
 eject = (store) ->
   datum = store.ordering.pop()?.data
-  delete store.data[datum.key] if datum
+  delete store.data[datum.k] if datum
   return
 
 
@@ -168,8 +155,8 @@ eject = (store) ->
 ###
 
 class Datum
-  constructor: (@key, @val) ->
-    @iter = null
+  constructor: (@k, @v) ->
+    @i = null
 
 
 ###
@@ -215,12 +202,7 @@ class LinkedList
     @length--
     node
 
-  pop: ->
-    popped = @tail
-    popped?.prev?.next = null
-    @tail = popped?.prev
-    @length-- if popped
-    popped
+  pop: -> if @tail then @remove(@tail) else null
 
 class ListNode
   constructor: (@data) ->
@@ -233,9 +215,4 @@ class ListNode
 # ======
 ###
 
-window.Unreliable = {
-  Store
-  bytes
-  kilobytes
-  megabytes
-}
+window.Unreliable = { Store }
