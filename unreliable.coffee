@@ -47,8 +47,16 @@ class Store
     @ordering = new LinkedList
     @hydrated = false
     @maxBytes = -1
-    @decode = (x) -> JSON.parse(x) || {}
-    @encode = (x) -> JSON.stringify(x) || ''
+    @decode = (x) ->
+      try
+        JSON.parse(x) || {}
+      catch e
+        {}
+    @encode = (x) ->
+      try
+        JSON.stringify(x) || ''
+      catch e
+        ''
     @namespace = null
 
   setItem: (key, val) ->
@@ -133,12 +141,9 @@ intermediateRepresentation = (store) ->
 hydrate = (store) ->
   return if store.hydrated
 
-  try
-    data = store.decode(store.read() || '') || {}
-    if store.namespace
-      data = data[store.namespace] || {}
-  catch e
-    data = {}
+  data = store.decode(store.read() || '') || {}
+  if store.namespace
+    data = data[store.namespace] || {}
 
   ordering = []
   for own key of data
