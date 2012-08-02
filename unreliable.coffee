@@ -83,6 +83,8 @@ class Store
     serialize(this)
     return
 
+  bytes: -> numBytes(@encode(intermediateRepresentation(this)))
+
 
 ###
 # Store class methods
