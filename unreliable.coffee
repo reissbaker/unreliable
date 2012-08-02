@@ -47,7 +47,7 @@ class Store
     hydrate this
 
     if !@data.hasOwnProperty(key)
-      datum = @data[key] = new Datum(key, val)
+      datum = @data[key] = datumStruct(key, val)
       datum.i = @ordering.unshift(datum)
     else
       datum = @data[key]
@@ -134,7 +134,7 @@ hydrate = (store) ->
   for own key of data
     curr = data[key]
     index = curr[INDEX_POSITION]
-    ordering[index] = data[key] = new Datum(key, curr[VAL_POSITION])
+    ordering[index] = data[key] = datumStruct(key, curr[VAL_POSITION])
 
   for datum in ordering
     datum.i = store.ordering.push(datum)
@@ -150,13 +150,11 @@ eject = (store) ->
 
 
 ###
-# Datum class
-# ===========
+# Datum struct
+# ============
 ###
 
-class Datum
-  constructor: (@k, @v) ->
-    @i = null
+datumStruct = (key, value) -> k: key, v: value, i: null
 
 
 ###
@@ -170,45 +168,41 @@ class LinkedList
     @length = 0
 
   push: (data) ->
-    node = new ListNode(data)
+    iter = iterStruct(data)
     if !@head
-      @head = @tail = node
+      @head = @tail = iter
     else
-      @tail.next = node
-      node.prev = @tail
-      @tail = node
+      @tail.next = iter
+      iter.prev = @tail
+      @tail = iter
     @length++
-    node
+    iter
 
   unshift: (data) ->
-    node = new ListNode(data)
+    iter = iterStruct(data)
     if !@head
-      @head = @tail = node
+      @head = @tail = iter
     else
-      @head.prev = node
-      node.next = @head
-      @head = node
+      @head.prev = iter
+      iter.next = @head
+      @head = iter
     @length++
-    node
+    iter
 
-  remove: (node) ->
-    if node == @head
-      @head = node.next
-    if node == @tail
-      @tail = node.prev
-    node.prev?.next = null
-    node.next?.prev = null
-    node.next = node.prev = null
+  remove: (iter) ->
+    if iter == @head
+      @head = iter.next
+    if iter == @tail
+      @tail = iter.prev
+    iter.prev?.next = null
+    iter.next?.prev = null
+    iter.next = iter.prev = null
     @length--
-    node
+    iter
 
   pop: -> if @tail then @remove(@tail) else null
 
-class ListNode
-  constructor: (@data) ->
-    @next = null
-    @prev = null
-
+iterStruct = (data) -> data: data, next: null, prev: null
 
 ###
 # Export
