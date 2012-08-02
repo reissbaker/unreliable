@@ -6,15 +6,6 @@ INDEX_POSITION = 1
 # =========
 ###
 
-###
-# identity
-# --------
-#
-# returns the identity function
-###
-
-identity = -> (x) -> x
-
 
 ###
 # numBytes
@@ -32,7 +23,7 @@ numBytes = (string) -> string.length * 2
 # For self-documenting filesize descriptions
 ###
 
-bytes = identity()
+bytes = (x) -> x
 kilobytes = (x) -> bytes(x) * 1024
 megabytes = (x) -> kilobytes(x) * 1024
 
