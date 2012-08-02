@@ -41,7 +41,7 @@ class Store
     proxy = new Store read, write
     proxy.maxBytes = bytes || megabytes(4)
     proxy
-    
+
   constructor: (@read, @write) ->
     @data = {}
     @ordering = new LinkedList
@@ -49,6 +49,7 @@ class Store
     @maxBytes = -1
     @decode = (x) -> JSON.parse(x) || {}
     @encode = (x) -> JSON.stringify(x) || ''
+    @namespace = null
 
   setItem: (key, val) ->
     hydrate this
@@ -101,7 +102,12 @@ promote = (store, datum) ->
   datum.iter = store.ordering.unshift(datum)
 
 serialize = (store) ->
-  serialization = store.encode intermediateRepresentation(store)
+  ir = intermediateRepresentation(store)
+  if store.namespace
+    temp = {}
+    temp[store.namespace] = ir
+    ir = temp
+  serialization = store.encode(ir)
   if store.maxBytes >= 0 && numBytes(serialization) > store.maxBytes
     if store.ordering.length > 0
       eject(store)
@@ -128,7 +134,9 @@ hydrate = (store) ->
   return if store.hydrated
 
   try
-    data = store.decode(store.read() || '')
+    data = store.decode(store.read() || '') || {}
+    if store.namespace
+      data = data[store.namespace] || {}
   catch e
     data = {}
 
