@@ -111,7 +111,7 @@ intermediateRepresentation = (store) ->
   index = 0
   while iter
     curr = iter.data
-    serialization = ir[curr.k] = []
+    serialization = ir[curr.k] = new Array(2)
     serialization[VAL_POSITION] = curr.v
     serialization[INDEX_POSITION] = index
     index++
