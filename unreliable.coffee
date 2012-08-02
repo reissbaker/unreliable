@@ -43,6 +43,13 @@ megabytes = (x) -> kilobytes(x) * 1024
 ###
 
 class Store
+  @proxy = (store, key, bytes) ->
+    read = -> store.getItem(key)
+    write = (data) -> store.setItem key, data
+    proxy = new Store read, write
+    proxy.maxBytes = bytes || megabytes(4)
+    proxy
+    
   constructor: (@read, @write) ->
     @data = {}
     @ordering = new LinkedList
@@ -215,15 +222,14 @@ class ListNode
     @prev = null
 
 
+###
+# Export
+# ======
+###
+
 window.Unreliable = {
   Store
   bytes
   kilobytes
   megabytes
-  localStorage: (key, bytes) ->
-    read = -> window.localStorage.getItem(key)
-    write = (data) -> window.localStorage.setItem(key, data)
-    store = new Store read, write
-    store.maxBytes = bytes || megabytes(4)
-    store
 }
