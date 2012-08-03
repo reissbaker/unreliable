@@ -23,25 +23,31 @@ numBytes = (string) -> string.length * 2
 ###
 
 class Store
-  @proxy = (store, key, bytes) ->
-    read = -> store.getItem(key)
-    write = (data) -> store.setItem key, data
-    proxy = new Store read, write
-    proxy.maxBytes = bytes || 1024 * 1024 * 4
-    proxy
+  @proxy = (store, key, options) ->
+    proxy = new Store {
+      read: -> store.getItem key
+      write: (data) -> store.setItem key, data
+      maxBytes: options.maxBytes
+      fingerprint: options.fingerprint
+    }
 
-  constructor: (@read, @write) ->
+  constructor: (options) ->
     @data = {}
     @ordering = new LinkedList
     @hydrated = false
-    @maxBytes = -1
-    @decode = (x) ->
+
+    @fingerprint = options.fingerprint
+    @maxBytes = if options.maxBytes? then options.maxBytes else -1
+
+    @read = options.read || -> {}
+    @write = options.write || (x) -> return
+
+    @decode = options.decode || (x) ->
       try
         JSON.parse(x) || {}
       catch e
         {}
-    @encode = (x) -> JSON.stringify(x)
-    @namespace = null
+    @encode = options.encode || (x) -> JSON.stringify(x)
 
   setItem: (key, val) ->
     hydrate this
@@ -119,10 +125,10 @@ intermediateRepresentation = (store) ->
     index++
     iter = iter.next
   
-  namespace = store.namespace
-  if namespace
+  fingerprint = store.fingerprint
+  if fingerprint
     temp = {}
-    temp[namespace] = ir
+    temp[fingerprint] = ir
     ir = temp
   ir
 
@@ -130,7 +136,7 @@ hydrate = (store) ->
   return if store.hydrated
 
   data = store.decode(store.read() || '') || {}
-  data = data[store.namespace] || {} if store.namespace
+  data = data[store.fingerprint] || {} if store.fingerprint
 
   ordering = []
   for own key of data
