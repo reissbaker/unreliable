@@ -243,9 +243,9 @@
 
 
   /*
-  # Linked List
-  # ===========
-  */
+   * Linked List
+   * ===========
+   */
 
   var LinkedList = (function() {
     function LinkedList() {
