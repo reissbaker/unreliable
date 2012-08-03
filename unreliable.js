@@ -80,6 +80,7 @@
 
     Store.prototype.setItem = hydrated(function(key, val) {
       var datum;
+      
       if(!own(this.data, key)) {
         datum = this.data[key] = datumStruct(key, val);
         datum.i = this.orderedData.unshift(datum);
@@ -88,6 +89,7 @@
         datum.v = val;
         promote(this, datum);
       }
+
       serialize(this);
       return val;
     });
