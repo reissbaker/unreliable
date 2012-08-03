@@ -16,7 +16,10 @@ INDEX_POSITION = 1
 
 numBytes = (string) -> string.length * 2
 
-
+hydrated = (method) ->
+  ->
+    hydrate this
+    method.apply this, arguments
 ###
 # Store
 # =====
@@ -49,9 +52,7 @@ class Store
         {}
     @encode = options.encode || (x) -> JSON.stringify(x)
 
-  setItem: (key, val) ->
-    hydrate this
-
+  setItem: hydrated (key, val) ->
     if !@data.hasOwnProperty(key)
       datum = @data[key] = datumStruct(key, val)
       datum.i = @ordering.unshift(datum)
@@ -63,7 +64,7 @@ class Store
     serialize(this)
     val
 
-  removeItem: (key) ->
+  removeItem: hydrated (key) ->
     datum = @data[key]
     if datum
       delete @data[key]
@@ -73,8 +74,7 @@ class Store
     else
       datum
 
-  getItem: (key, cbk) ->
-    hydrate this
+  getItem: hydrated (key) ->
     datum = @data[key]
     if datum
       promote(this, datum)
@@ -89,7 +89,7 @@ class Store
     serialize(this)
     return
 
-  bytes: -> numBytes(@encode(intermediateRepresentation(this)))
+  bytes: hydrated -> numBytes @encode(intermediateRepresentation(this))
 
 
 ###
