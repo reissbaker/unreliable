@@ -1,18 +1,24 @@
 !function(window) {
+  'use strict';
+
   /*
-  # Utilities
-  # =========
-  */
+   * Utilities
+   * =========
+   */
 
 
   /*
-  # numBytes
-  # --------
-  #
-  # returns the number of bytes the string uses
-  */
+   * numBytes
+   * --------
+   *
+   * returns the number of bytes the string uses
+   */
 
   function numBytes(string) { return string.length * 2; }
+
+  function own(object, property) {
+    return {}.hasOwnProperty.call(object, property);
+  }
 
 
   /*
@@ -26,27 +32,23 @@
 
     function Store(options) {
       this.data = {};
-      this.ordering = new LinkedList;
+      this.orderedData = new LinkedList;
       this.hydrated = false;
 
-      this.fingerprint = options.fingerprint;
-      this.maxBytes = options.maxBytes != null ? options.maxBytes : -1;
-
-      this.read = options.read || function() {
-        return {};
-      };
-      this.write = options.write || function(x) {};
-
-      this.decode = options.decode || function(x) {
-        try {
-          return JSON.parse(x) || {};
-        } catch(e) {
-          return {};
-        }
-      };
-      this.encode = options.encode || function(x) {
-        return JSON.stringify(x);
-      };
+      setDefaultOptions(this, options, {
+        fingerprint: null,
+        capacity: -1,
+        read: function() { return {}; },
+        write: function() {},
+        decode: function(x) {
+          try {
+            return JSON.parse(x) || {};
+          } catch(e) {
+            return {};
+          }
+        },
+        encode: function(x) { return JSON.stringify(x); }
+      });
     }
 
     
@@ -62,6 +64,14 @@
       };
     }
 
+    function setDefaultOptions(store, options, defaults) {
+      for(var prop in defaults) {
+        if(own(defaults ,prop)) {
+          store[prop] = options[prop] != null ? options[prop] : defaults[prop];
+        }
+      }
+    }
+
 
     /*
      * Public Store methods
@@ -70,9 +80,9 @@
 
     Store.prototype.setItem = hydrated(function(key, val) {
       var datum;
-      if (!this.data.hasOwnProperty(key)) {
+      if(!own(this.data, key)) {
         datum = this.data[key] = datumStruct(key, val);
-        datum.i = this.ordering.unshift(datum);
+        datum.i = this.orderedData.unshift(datum);
       } else {
         datum = this.data[key];
         datum.v = val;
@@ -83,33 +93,33 @@
     });
 
     Store.prototype.removeItem = hydrated(function(key) {
-      var datum;
-      datum = this.data[key];
-      if (datum) {
+      var datum = this.data[key];
+
+      if(datum) {
         delete this.data[key];
-        this.ordering.remove(datum.i);
+        this.orderedData.remove(datum.i);
         serialize(this);
         return datum.v;
-      } else {
-        return datum;
-      }
+      } 
+
+      return datum;
     });
 
     Store.prototype.getItem = hydrated(function(key) {
-      var datum;
-      datum = this.data[key];
-      if (datum) {
+      var datum = this.data[key];
+
+      if(datum) {
         promote(this, datum);
         serialize(this);
         return datum.v;
-      } else {
-        return datum;
       }
+
+      return datum;
     });
 
     Store.prototype.clear = function() {
       this.data = {};
-      this.ordering = new LinkedList;
+      this.orderedData = new LinkedList;
       serialize(this);
     };
 
@@ -124,13 +134,9 @@
 
     Store.proxy = function(store, key, options) {
       return new Store({
-        read: function() {
-          return store.getItem(key);
-        },
-        write: function(data) {
-          return store.setItem(key, data);
-        },
-        maxBytes: options.maxBytes,
+        read: function() { return store.getItem(key); },
+        write: function(data) { return store.setItem(key, data); },
+        capacity: options.capacity,
         fingerprint: options.fingerprint
       });
     };
@@ -141,14 +147,16 @@
      */
 
     function promote(store, datum) {
-      store.ordering.remove(datum.i);
-      return datum.i = store.ordering.unshift(datum);
+      store.orderedData.remove(datum.i);
+      datum.i = store.orderedData.unshift(datum);
     }
 
     function serialize(store) {
-      var serialization;
-      serialization = store.encode(intermediateRepresentation(store));
-      if (store.maxBytes >= 0 && numBytes(serialization) > store.maxBytes && store.ordering.length > 0) {
+      var serialization = store.encode(intermediateRepresentation(store)),
+          capacity = store.capacity,
+          orderedData = store.orderedData;
+
+      if(capacity >= 0 && numBytes(serialization) > capacity && orderedData.length > 0) {
         eject(store);
         serialize(store);
       } else {
@@ -157,58 +165,59 @@
     }
 
     function intermediateRepresentation(store) {
-      var curr, fingerprint, index, ir, iter, serialization, storeOrdering, temp;
-      ir = {};
-      storeOrdering = store.ordering;
-      iter = storeOrdering.head;
+      var curr, index, temp, iter, serialization,
+          ir = {},
+          orderedData = store.orderedData,
+          fingerprint = store.fingerprint;
+
       index = 0;
-      while (iter) {
+      for(iter = orderedData.head; iter; iter = iter.next) {
         curr = iter.data;
         serialization = ir[curr.k] = new Array(2);
         serialization[VAL_POSITION] = curr.v;
         serialization[INDEX_POSITION] = index;
         index++;
-        iter = iter.next;
       }
-      fingerprint = store.fingerprint;
-      if (fingerprint) {
+
+      if(fingerprint) {
         temp = {};
         temp[fingerprint] = ir;
         ir = temp;
       }
+
       return ir;
     }
 
     function hydrate(store) {
-      var curr, data, datum, index, key, ordering, _i, _len;
-      if (store.hydrated) {
-        return;
-      }
+      var data, ordering, key, index, length, curr,
+          fingerprint = store.fingerprint;
+
+      if(store.hydrated) return;
+
       data = store.decode(store.read() || '') || {};
-      if (store.fingerprint) {
-        data = data[store.fingerprint] || {};
-      }
+      if(fingerprint) data = data[fingerprint] || {};
+
       ordering = [];
-      for (key in data) {
-        if (!data.hasOwnProperty(key)) continue;
-        curr = data[key];
-        index = curr[INDEX_POSITION];
-        ordering[index] = data[key] = datumStruct(key, curr[VAL_POSITION]);
+      for(key in data) {
+        if(own(data, key)) {
+          curr = data[key];
+          index = curr[INDEX_POSITION];
+          ordering[index] = data[key] = datumStruct(key, curr[VAL_POSITION]);
+        }
       }
-      for (_i = 0, _len = ordering.length; _i < _len; _i++) {
-        datum = ordering[_i];
-        datum.i = store.ordering.push(datum);
+
+      for(index = 0, length = ordering.length; index < length; index++) {
+        curr = ordering[index];
+        curr.i = store.orderedData.push(curr);
       }
+
       store.data = data;
       store.hydrated = true;
     }
 
     function eject(store) {
-      var datum, _ref;
-      datum = (_ref = store.ordering.pop()) != null ? _ref.data : void 0;
-      if (datum) {
-        delete store.data[datum.k];
-      }
+      var iter = store.orderedData.pop();
+      if(iter) delete store.data[iter.data.k];
     }
 
     return Store;
@@ -232,11 +241,11 @@
 
 
   /*
-  # Linked list
+  # Linked orderedData
   # ===========
   */
 
-  LinkedList = (function() {
+  var LinkedList = (function() {
     function LinkedList() {
       this.head = this.tail = null;
       this.length = 0;
@@ -258,7 +267,7 @@
 
     LinkedList.prototype.unshift = function(data) {
       var iter = iterStruct(data);
-      if (!this.head) {
+      if(!this.head) {
         this.head = this.tail = iter;
       } else {
         this.head.prev = iter;
@@ -270,31 +279,27 @@
     };
 
     LinkedList.prototype.remove = function(iter) {
-      var _ref, _ref1;
-      if (iter === this.head) {
-        this.head = iter.next;
-      }
-      if (iter === this.tail) {
-        this.tail = iter.prev;
-      }
-      if ((_ref = iter.prev) != null) {
-        _ref.next = null;
-      }
-      if ((_ref1 = iter.next) != null) {
-        _ref1.prev = null;
-      }
+      var next = iter.next,
+          prev = iter.prev;
+
+      if(iter === this.head) this.head = next;
+      if(iter === this.tail) this.tail = prev;
+      
+      if(prev) prev.next = next;
+      if(next) next.prev = prev;
+
       iter.next = iter.prev = null;
+
       this.length--;
       return iter;
     };
 
     LinkedList.prototype.pop = function() {
-      if (this.tail) return this.remove(this.tail);
+      if(this.tail) return this.remove(this.tail);
       return null;
     };
 
     return LinkedList;
-
   })();
 
   function iterStruct(data) {
