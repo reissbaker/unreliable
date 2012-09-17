@@ -1,4 +1,4 @@
-!function(window) {
+!function(root) {
   'use strict';
 
   /*
@@ -8,13 +8,24 @@
 
 
   /*
-   * numBytes
-   * --------
+   * Returns the number of bytes the string uses.
    *
-   * returns the number of bytes the string uses
+   * Takes:
+   *
+   * - `string`: a string.
    */
 
   function numBytes(string) { return string.length * 2; }
+
+
+  /*
+   * A safe shim for `hasOwnProperty`.
+   *
+   * Takes:
+   *
+   * - `object`: an object.
+   * - `property`: a string property.
+   */
 
   function own(object, property) {
     return {}.hasOwnProperty.call(object, property);
@@ -22,8 +33,46 @@
 
 
   /*
-   * Store
-   * =====
+   * Store Class
+   * ===========
+   */
+
+  /*
+   * Store constructor.
+   *
+   * Arguments:
+   *
+   *   - `options`: a hash of options. The following are options that can be
+   *      set:
+   *
+   *      + `fingerprint`: a unique key that will distinguish this dataset from
+   *         any others. For example, if you're doing per-user storage, you may
+   *         want to use a user id as a key to ensure multiple users don't
+   *         accidentally write to the same storage location.
+   *
+   *      + `capacity`: the maximum capacity the store should allow, in bytes.
+   *         If the capacity is exceeded, the store will begin the least
+   *         recently used data, until the dataset is under the capacity.
+   *         `capacity` must, if specified, be greater than 0.
+   *
+   *      + `read`: a function of the form `function() {}` that returns a 
+   *         string from storage. If left unspecified, the store will never be 
+   *         able to read from its backing store.
+   *
+   *      + `write`: a function of the form `function(string) {}` that writes
+   *         a string to a backing store. If left unspecified, the store will
+   *         never be able to serialized to its backing store.
+   *
+   *      + `decode`: a function of the form `function(string) {}` that takes a
+   *         string and returns an object. `decode` will be called after `read`
+   *         to convert the string returned by read into usable data. If left
+   *         unspecified, `decode` will attempt to parse the string as JSON.
+   *
+   *      + `encode`: a function of the form `function(obj) {}` that takes an
+   *         object and returns a string. `encode` will be called before
+   *         `write` to convert the current data to a string format. If left
+   *         unspecified, `encode` will attempt to serialize the object as
+   *         JSON.
    */
 
   var Store = (function() {
@@ -57,6 +106,15 @@
      * -------------------------------
      */
 
+    /*
+     * Given an instance method, returns a wrapper that that calls `hydrate`
+     * on the instance before calling the method.
+     *
+     * Arguments:
+     *  
+     *   - `method`: an instance method.
+     */
+
     function hydrated(method) {
       return function() {
         hydrate(this);
@@ -65,6 +123,7 @@
     }
 
     function setDefaultOptions(store, options, defaults) {
+      if(!options) options = {};
       for(var prop in defaults) {
         if(own(defaults ,prop)) {
           store[prop] = options[prop] != null ? options[prop] : defaults[prop];
@@ -228,7 +287,7 @@
 
 
   /*
-   * Datum struct
+   * Datum Struct
    * ============
    */
 
@@ -243,8 +302,8 @@
 
 
   /*
-   * Linked List
-   * ===========
+   * Linked List Class
+   * =================
    */
 
   var LinkedList = (function() {
@@ -318,8 +377,6 @@
    * ======
    */
 
-  window.Unreliable = {
-    Store: Store
-  };
+  root.UnreliableStore = Store;
 
-}(window);
+}(typeof exports === 'undefined' ? window : exports);
