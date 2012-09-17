@@ -1,0 +1,15 @@
+{
+  "author": "Matt Baker",
+  "name": "unreliable",
+  "version": "0.0.1",
+  "repository": {
+  },
+  "main": "unreliable.js"
+  "dependencies": {},
+  "devDependencies": {
+    "uglifyjs": "1.3.3",
+    "coffee-script": "1.3.3",
+    "mocha": "1.4.2",
+    "expect.js": "0.1.2"
+  }
+}
